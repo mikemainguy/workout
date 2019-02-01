@@ -5,7 +5,7 @@ import {HttpClient, HttpHeaders} from '@angular/common/http';
   providedIn: 'root'
 })
 export class WorkoutService {
-  apiUrl = 'https://workout.restlet.net/v2/categories/';
+  apiUrl = 'https://workout.restlet.net/v2/';
 
   /*");\n' +
       '\n' +
@@ -30,7 +30,17 @@ export class WorkoutService {
 
   getCategories() {
     return new Promise((resolve, reject) => {
-      this.http.get(this.apiUrl, {headers: this.headers}).subscribe(data => {
+      this.http.get(this.apiUrl + 'categories/', {headers: this.headers}).subscribe(data => {
+        resolve(data);
+      }, err => {
+        console.log(err);
+      });
+    });
+  }
+
+  getExercises() {
+    return new Promise((resolve, reject) => {
+      this.http.get(this.apiUrl + 'exercises/', {headers: this.headers}).subscribe(data => {
         resolve(data);
       }, err => {
         console.log(err);
