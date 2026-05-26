@@ -38,7 +38,35 @@ function isoWeek(dateStr: string): string {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
 }
 
-function aggregate(workouts: Workout[], groupBy: Aggregation, metric: boolean): DataPoint[] {
+const EMPTY_POINT: Omit<DataPoint, 'label'> = { sets: 0, reps: 0, avgWeight: 0, maxWeight: 0, totalVolume: 0 }
+
+function allWeeksBetween(first: string, last: string): string[] {
+  const weeks: string[] = []
+  // Start from the Monday of the first week
+  const d = new Date(first + 'T00:00:00')
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() - dayNum + 1) // back to Monday
+  while (isoWeek(d.toISOString().slice(0, 10)) <= last) {
+    weeks.push(isoWeek(d.toISOString().slice(0, 10)))
+    d.setUTCDate(d.getUTCDate() + 7)
+  }
+  return weeks
+}
+
+function allMonthsBetween(first: string, last: string): string[] {
+  const months: string[] = []
+  const [y1, m1] = first.split('-').map(Number)
+  const [y2, m2] = last.split('-').map(Number)
+  let y = y1, m = m1
+  while (y < y2 || (y === y2 && m <= m2)) {
+    months.push(`${y}-${String(m).padStart(2, '0')}`)
+    m++
+    if (m > 12) { m = 1; y++ }
+  }
+  return months
+}
+
+function aggregate(workouts: Workout[], groupBy: Aggregation, metric: boolean, showEmpty: boolean): DataPoint[] {
   const groups = new Map<string, Workout[]>()
 
   for (const w of workouts) {
@@ -52,8 +80,27 @@ function aggregate(workouts: Workout[], groupBy: Aggregation, metric: boolean): 
     groups.set(key, arr)
   }
 
-  const points: DataPoint[] = []
-  for (const [label, sets] of groups) {
+  // Determine which keys to include
+  let allKeys: string[]
+  if (showEmpty && groups.size > 0 && groupBy !== 'workout') {
+    const sorted = [...groups.keys()].sort()
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    if (groupBy === 'week') {
+      // Need the first datePart for week calculation
+      const firstDate = workouts.reduce((min, w) => w.datePart < min ? w.datePart : min, workouts[0].datePart)
+      allKeys = allWeeksBetween(firstDate, last)
+    } else {
+      allKeys = allMonthsBetween(first, last)
+    }
+  } else {
+    allKeys = [...groups.keys()].sort()
+  }
+
+  return allKeys.map((label) => {
+    const sets = groups.get(label)
+    if (!sets || sets.length === 0) return { label, ...EMPTY_POINT }
+
     const totalSets = sets.length
     const totalReps = sets.reduce((s, w) => s + w.reps, 0)
     const weights = sets.map((w) => metric ? w.weightKg : w.weightLbs).filter((v) => v > 0)
@@ -64,10 +111,8 @@ function aggregate(workouts: Workout[], groupBy: Aggregation, metric: boolean): 
       return s + wt * w.reps
     }, 0)
 
-    points.push({ label, sets: totalSets, reps: totalReps, avgWeight, maxWeight, totalVolume })
-  }
-
-  return points.sort((a, b) => a.label.localeCompare(b.label))
+    return { label, sets: totalSets, reps: totalReps, avgWeight, maxWeight, totalVolume }
+  })
 }
 
 export function useWorkoutAnalysis() {
@@ -81,6 +126,7 @@ export function useWorkoutAnalysis() {
   const aggregation = ref<Aggregation>('workout')
   const enabledStats = ref(new Set<StatKey>(['avgWeight', 'maxWeight']))
   const useMetric = ref(false)
+  const showEmpty = ref(true)
 
   onMounted(async () => {
     allWorkouts.value = await db.workouts.orderBy('date').toArray()
@@ -121,7 +167,7 @@ export function useWorkoutAnalysis() {
   })
 
   const analysisData = computed(() => {
-    return aggregate(filteredWorkouts.value, aggregation.value, useMetric.value)
+    return aggregate(filteredWorkouts.value, aggregation.value, useMetric.value, showEmpty.value)
   })
 
   const summary = computed(() => {
@@ -176,6 +222,7 @@ export function useWorkoutAnalysis() {
     aggregation,
     enabledStats,
     useMetric,
+    showEmpty,
     analysisData,
     summary,
     chartData,

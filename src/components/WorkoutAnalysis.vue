@@ -26,6 +26,7 @@ const {
   aggregation,
   enabledStats,
   useMetric,
+  showEmpty,
   summary,
   chartData,
   hasCountAxis,
@@ -113,6 +114,13 @@ function formatNum(n: number, decimals = 1): string {
       </label>
       <label class="inline-flex items-center gap-1 cursor-pointer">
         <input type="radio" v-model="aggregation" value="month" /> Monthly
+      </label>
+      <label
+        v-if="aggregation !== 'workout'"
+        class="inline-flex items-center gap-1 cursor-pointer ml-4 text-gray-500"
+      >
+        <input type="checkbox" v-model="showEmpty" class="accent-gray-600" />
+        Show empty periods
       </label>
     </div>
 
