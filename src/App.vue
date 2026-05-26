@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { seedFromCsv, seedFromFitNotes } from './db'
+import { seedFromCsv, seedFromFitNotes, seedFromPeloton } from './db'
 import GroupedWorkoutTable from './components/GroupedWorkoutTable.vue'
 import WorkoutAnalysis from './components/WorkoutAnalysis.vue'
 
@@ -8,7 +8,7 @@ const ready = ref(false)
 const currentView = ref<'table' | 'analysis'>('table')
 
 onMounted(async () => {
-  await Promise.all([seedFromCsv(), seedFromFitNotes()])
+  await Promise.all([seedFromCsv(), seedFromFitNotes(), seedFromPeloton()])
   ready.value = true
 })
 </script>

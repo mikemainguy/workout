@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useGroupedWorkouts, type SetDisplay, type ExerciseRow } from '../composables/useGroupedWorkouts'
 import { db } from '../db'
+import { formatDuration } from '../utils/format'
 
 const SETS_PER_ROW = 6
 
@@ -44,15 +45,6 @@ function chunk<T>(arr: T[], size: number): T[][] {
     chunks.push(arr.slice(i, i + size))
   }
   return chunks.length ? chunks : [[]]
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.round(seconds % 60)
-  if (h > 0) return `${h}h ${m}m ${s}s`
-  if (m > 0) return `${m}m ${s}s`
-  return `${s}s`
 }
 
 function formatDistance(set: SetDisplay): string {

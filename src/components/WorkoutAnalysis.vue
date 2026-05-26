@@ -12,11 +12,14 @@ import {
   Legend,
 } from 'chart.js'
 import { useWorkoutAnalysis, type StatKey } from '../composables/useWorkoutAnalysis'
+import { formatDuration } from '../utils/format'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 const {
   loading,
+  selectedSource,
+  sourceList,
   selectedCategory,
   categoryList,
   selectedExercise,
@@ -27,16 +30,17 @@ const {
   enabledStats,
   useMetric,
   showEmpty,
+  e1rmMethod,
   summary,
   chartData,
-  hasCountAxis,
-  hasWeightAxis,
+  chartScales,
   toggleStat,
+  statUnit,
   STAT_COLORS,
   STAT_LABELS,
+  STRENGTH_STATS,
+  CARDIO_STATS,
 } = useWorkoutAnalysis()
-
-const ALL_STATS: StatKey[] = ['sets', 'reps', 'avgWeight', 'maxWeight', 'totalVolume']
 
 const chartOptions = computed(() => ({
   responsive: true,
@@ -45,25 +49,22 @@ const chartOptions = computed(() => ({
     mode: 'index' as const,
     intersect: false,
   },
-  scales: {
-    'y-weight': {
-      type: 'linear' as const,
-      position: 'left' as const,
-      display: hasWeightAxis.value,
-      title: { display: true, text: useMetric.value ? 'kg' : 'lbs' },
-    },
-    'y-count': {
-      type: 'linear' as const,
-      position: 'right' as const,
-      display: hasCountAxis.value,
-      grid: { drawOnChartArea: false },
-      title: { display: true, text: 'Count' },
-    },
-  },
+  scales: chartScales.value,
   plugins: {
     legend: { position: 'bottom' as const },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => {
+          const label = ctx.dataset.label || ''
+          if (label.startsWith('Duration')) return `${label}: ${formatDuration(ctx.parsed.y)}`
+          return `${label}: ${ctx.formattedValue}`
+        },
+      },
+    },
   },
 }))
+
+const allEnabledStats = computed(() => [...STRENGTH_STATS, ...CARDIO_STATS].filter((s) => enabledStats.value.has(s)))
 
 function formatNum(n: number, decimals = 1): string {
   return n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : n.toFixed(decimals)
@@ -75,6 +76,13 @@ function formatNum(n: number, decimals = 1): string {
   <div v-else>
     <!-- Filters -->
     <div class="flex flex-wrap items-end gap-4 mb-4">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Source</label>
+        <select v-model="selectedSource" class="border border-gray-300 rounded px-2 py-1 text-sm">
+          <option value="All">All</option>
+          <option v-for="s in sourceList" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </div>
       <div>
         <label class="block text-xs text-gray-500 mb-1">Category</label>
         <select v-model="selectedCategory" class="border border-gray-300 rounded px-2 py-1 text-sm">
@@ -124,11 +132,11 @@ function formatNum(n: number, decimals = 1): string {
       </label>
     </div>
 
-    <!-- Stats toggles -->
-    <div class="flex flex-wrap items-center gap-3 mb-4 text-sm">
-      <span class="text-xs text-gray-500">Stats:</span>
+    <!-- Strength stats -->
+    <div class="flex flex-wrap items-center gap-3 mb-2 text-sm">
+      <span class="text-xs text-gray-500 font-medium">Strength:</span>
       <label
-        v-for="stat in ALL_STATS"
+        v-for="stat in STRENGTH_STATS"
         :key="stat"
         class="inline-flex items-center gap-1 cursor-pointer"
       >
@@ -139,6 +147,38 @@ function formatNum(n: number, decimals = 1): string {
           :style="{ accentColor: STAT_COLORS[stat] }"
         />
         <span :style="{ color: STAT_COLORS[stat] }">{{ STAT_LABELS[stat] }}</span>
+      </label>
+    </div>
+
+    <!-- Cardio stats -->
+    <div class="flex flex-wrap items-center gap-3 mb-4 text-sm">
+      <span class="text-xs text-gray-500 font-medium">Cardio:</span>
+      <label
+        v-for="stat in CARDIO_STATS"
+        :key="stat"
+        class="inline-flex items-center gap-1 cursor-pointer"
+      >
+        <input
+          type="checkbox"
+          :checked="enabledStats.has(stat)"
+          @change="toggleStat(stat)"
+          :style="{ accentColor: STAT_COLORS[stat] }"
+        />
+        <span :style="{ color: STAT_COLORS[stat] }">{{ STAT_LABELS[stat] }}</span>
+      </label>
+    </div>
+
+    <!-- E1RM method -->
+    <div v-if="enabledStats.has('e1rm')" class="flex items-center gap-4 mb-3 text-sm text-gray-700">
+      <span class="text-xs text-gray-500">1RM Formula:</span>
+      <label class="inline-flex items-center gap-1 cursor-pointer">
+        <input type="radio" v-model="e1rmMethod" value="epley" /> Epley
+      </label>
+      <label class="inline-flex items-center gap-1 cursor-pointer">
+        <input type="radio" v-model="e1rmMethod" value="brzycki" /> Brzycki
+      </label>
+      <label class="inline-flex items-center gap-1 cursor-pointer">
+        <input type="radio" v-model="e1rmMethod" value="average" /> Average
       </label>
     </div>
 
@@ -153,17 +193,16 @@ function formatNum(n: number, decimals = 1): string {
     <!-- Summary Cards -->
     <div class="flex flex-wrap gap-3">
       <div
-        v-for="stat in ALL_STATS"
+        v-for="stat in allEnabledStats"
         :key="stat"
-        v-show="enabledStats.has(stat)"
         class="flex-1 min-w-[120px] bg-white rounded-lg border border-gray-200 p-3 text-center"
       >
         <div class="text-xs text-gray-500">{{ STAT_LABELS[stat] }}</div>
         <div class="text-xl font-semibold mt-1" :style="{ color: STAT_COLORS[stat] }">
-          {{ formatNum(summary[stat]) }}
+          {{ stat === 'duration' ? formatDuration(summary[stat]) : formatNum(summary[stat]) }}
         </div>
-        <div v-if="stat.includes('eight') || stat === 'totalVolume'" class="text-xs text-gray-400">
-          {{ useMetric ? 'kg' : 'lbs' }}
+        <div v-if="statUnit(stat)" class="text-xs text-gray-400">
+          {{ statUnit(stat) }}
         </div>
       </div>
     </div>
