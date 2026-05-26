@@ -241,9 +241,6 @@ export function useWorkoutAnalysis() {
 
   onMounted(async () => {
     allWorkouts.value = await db.workouts.orderBy('date').toArray()
-    const pelotonCount = allWorkouts.value.filter((w) => w.source === 'peloton').length
-    const withCalories = allWorkouts.value.filter((w) => (w.calories ?? 0) > 0).length
-    const withDistance = allWorkouts.value.filter((w) => w.distanceMi > 0).length
     loading.value = false
   })
 
@@ -338,11 +335,12 @@ export function useWorkoutAnalysis() {
 
   const chartData = computed(() => {
     const enabled = [...enabledStats.value]
+    const labels = analysisData.value.map((d) => d.label)
     const datasets = enabled.map((stat) => {
       const unit = statUnit(stat)
       return {
         label: STAT_LABELS[stat] + (unit ? ` (${unit})` : ''),
-        data: analysisData.value.map((d) => ({ x: d.label, y: d[stat] })),
+        data: analysisData.value.map((d) => d[stat]),
         borderColor: STAT_COLORS[stat],
         backgroundColor: STAT_COLORS[stat] + '20',
         tension: 0.3,
@@ -351,7 +349,7 @@ export function useWorkoutAnalysis() {
       }
     })
 
-    return { datasets }
+    return { labels, datasets }
   })
 
   // Each enabled stat gets its own Y-axis so different units scale independently.

@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
-import { useWorkoutAnalysis, type StatKey } from '../composables/useWorkoutAnalysis'
+import { useWorkoutAnalysis } from '../composables/useWorkoutAnalysis'
 import { formatDuration } from '../utils/format'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
@@ -68,6 +68,17 @@ const allEnabledStats = computed(() => [...STRENGTH_STATS, ...CARDIO_STATS].filt
 
 function formatNum(n: number, decimals = 1): string {
   return n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : n.toFixed(decimals)
+}
+
+function formatWeight(n: number, metric: boolean): string {
+  const base = formatNum(n)
+  const tonsThreshold = metric ? 9072 : 20000 // 10 tons in kg or lbs
+  const tonsDiv = metric ? 907.2 : 2000       // 1 ton in kg or lbs
+  const unit = metric ? 'metric tons' : 'tons'
+  if (n >= tonsThreshold) {
+    return `${base} (${(n / tonsDiv).toFixed(1)} ${unit})`
+  }
+  return base
 }
 </script>
 
@@ -199,7 +210,7 @@ function formatNum(n: number, decimals = 1): string {
       >
         <div class="text-xs text-gray-500">{{ STAT_LABELS[stat] }}</div>
         <div class="text-xl font-semibold mt-1" :style="{ color: STAT_COLORS[stat] }">
-          {{ stat === 'duration' ? formatDuration(summary[stat]) : formatNum(summary[stat]) }}
+          {{ stat === 'duration' ? formatDuration(summary[stat]) : (statUnit(stat) === 'lbs' || statUnit(stat) === 'kg') ? formatWeight(summary[stat], useMetric) : formatNum(summary[stat]) }}
         </div>
         <div v-if="statUnit(stat)" class="text-xs text-gray-400">
           {{ statUnit(stat) }}
